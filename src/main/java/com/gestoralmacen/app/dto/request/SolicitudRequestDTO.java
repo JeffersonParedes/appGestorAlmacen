@@ -3,6 +3,7 @@ package com.gestoralmacen.app.dto.request;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class SolicitudRequestDTO {
@@ -24,6 +25,12 @@ public class SolicitudRequestDTO {
     private String estado; // PENDIENTE | APROBADA | RECHAZADA
 
     private String observacion;
+
+    // Valores propuestos para EDITAR_PRODUCTO / PRODUCTO (solo se aplican al aprobar)
+    @Size(max = 150, message = "El nombre propuesto no puede exceder los 150 caracteres")
+    private String nombrePropuesto;
+
+    private BigDecimal precioPropuesto;
 
     private Long aprobadoPor; // ID del usuario aprobador
 
@@ -80,6 +87,22 @@ public class SolicitudRequestDTO {
 
     public void setObservacion(String observacion) {
         this.observacion = observacion;
+    }
+
+    public String getNombrePropuesto() {
+        return nombrePropuesto;
+    }
+
+    public void setNombrePropuesto(String nombrePropuesto) {
+        this.nombrePropuesto = nombrePropuesto;
+    }
+
+    public BigDecimal getPrecioPropuesto() {
+        return precioPropuesto;
+    }
+
+    public void setPrecioPropuesto(BigDecimal precioPropuesto) {
+        this.precioPropuesto = precioPropuesto;
     }
 
     public Long getAprobadoPor() {

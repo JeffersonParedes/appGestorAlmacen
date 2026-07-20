@@ -53,14 +53,20 @@ public class SolicitudServiceImpl implements SolicitudService {
         solicitud.setUsuario(usuario);
         solicitud.setEstado("PENDIENTE");
 
+        boolean observacionPropia = dto.getObservacion() != null && !dto.getObservacion().isBlank();
+
         if ("PRODUCTO".equalsIgnoreCase(dto.getTipo())) {
             Producto producto = productoRepository.findById(dto.getReferenciaId())
                     .orElseThrow(() -> new RecursoNoEncontradoException("Producto de referencia no encontrado"));
-            solicitud.setObservacion("Solicitud de aprobación para producto: " + producto.getNombre());
+            if (!observacionPropia) {
+                solicitud.setObservacion("Solicitud de aprobación para producto: " + producto.getNombre());
+            }
         } else if ("CATEGORIA".equalsIgnoreCase(dto.getTipo())) {
             Categoria categoria = categoriaRepository.findById(dto.getReferenciaId())
                     .orElseThrow(() -> new RecursoNoEncontradoException("Categoría de referencia no encontrada"));
-            solicitud.setObservacion("Solicitud de aprobación para categoría: " + categoria.getNombre());
+            if (!observacionPropia) {
+                solicitud.setObservacion("Solicitud de aprobación para categoría: " + categoria.getNombre());
+            }
         } else {
             throw new ReglaNegocioException("Tipo de solicitud no válido: " + dto.getTipo());
         }
@@ -109,13 +115,28 @@ public class SolicitudServiceImpl implements SolicitudService {
         }
 
         solicitud.setEstado(estado);
-        solicitud.setObservacion(motivoRechazo);
+        if (motivoRechazo != null && !motivoRechazo.isBlank()) {
+            // Solo sobrescribimos la observación si viene un motivo real (ej. al rechazar).
+            // Al aprobar sin motivo, se conserva la observación original de la solicitud.
+            solicitud.setObservacion(motivoRechazo);
+        }
         solicitud.setFechaRespuesta(LocalDateTime.now());
         solicitudRepository.save(solicitud);
 
         if ("PRODUCTO".equalsIgnoreCase(solicitud.getTipo())) {
             Producto producto = productoRepository.findById(solicitud.getReferenciaId())
                     .orElseThrow(() -> new RecursoNoEncontradoException("Producto de referencia no encontrado"));
+
+            if ("APROBADO".equals(estado)) {
+                // Aplicamos los cambios propuestos (nombre/precio) solo si vinieron en la solicitud.
+                if (solicitud.getNombrePropuesto() != null && !solicitud.getNombrePropuesto().isBlank()) {
+                    producto.setNombre(solicitud.getNombrePropuesto());
+                }
+                if (solicitud.getPrecioPropuesto() != null) {
+                    producto.setPrecio(solicitud.getPrecioPropuesto());
+                }
+            }
+
             producto.setEstadoAprobacion(estado);
             productoRepository.save(producto);
         } else if ("CATEGORIA".equalsIgnoreCase(solicitud.getTipo())) {

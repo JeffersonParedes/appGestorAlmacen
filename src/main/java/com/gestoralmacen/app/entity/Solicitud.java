@@ -1,6 +1,7 @@
 package com.gestoralmacen.app.entity;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -29,6 +30,12 @@ public class Solicitud {
 
     @Column(columnDefinition = "TEXT")
     private String observacion;
+
+    @Column(name = "nombre_propuesto", length = 150)
+    private String nombrePropuesto;
+
+    @Column(name = "precio_propuesto", precision = 10, scale = 2)
+    private BigDecimal precioPropuesto;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "aprobado_por")
@@ -118,6 +125,22 @@ public class Solicitud {
 
     public void setObservacion(String observacion) {
         this.observacion = observacion;
+    }
+
+    public String getNombrePropuesto() {
+        return nombrePropuesto;
+    }
+
+    public void setNombrePropuesto(String nombrePropuesto) {
+        this.nombrePropuesto = nombrePropuesto;
+    }
+
+    public BigDecimal getPrecioPropuesto() {
+        return precioPropuesto;
+    }
+
+    public void setPrecioPropuesto(BigDecimal precioPropuesto) {
+        this.precioPropuesto = precioPropuesto;
     }
 
     public Usuario getAprobadoPor() {

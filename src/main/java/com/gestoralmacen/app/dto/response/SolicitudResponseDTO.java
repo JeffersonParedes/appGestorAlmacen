@@ -1,5 +1,6 @@
 package com.gestoralmacen.app.dto.response;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class SolicitudResponseDTO {
@@ -12,6 +13,8 @@ public class SolicitudResponseDTO {
     private Long referenciaId;
     private String estado;
     private String observacion;
+    private String nombrePropuesto;
+    private BigDecimal precioPropuesto;
     private Long aprobadoPorId;
     private String nombreAprobador;
     private LocalDateTime fechaSolicitud;
@@ -84,6 +87,22 @@ public class SolicitudResponseDTO {
 
     public void setObservacion(String observacion) {
         this.observacion = observacion;
+    }
+
+    public String getNombrePropuesto() {
+        return nombrePropuesto;
+    }
+
+    public void setNombrePropuesto(String nombrePropuesto) {
+        this.nombrePropuesto = nombrePropuesto;
+    }
+
+    public BigDecimal getPrecioPropuesto() {
+        return precioPropuesto;
+    }
+
+    public void setPrecioPropuesto(BigDecimal precioPropuesto) {
+        this.precioPropuesto = precioPropuesto;
     }
 
     public Long getAprobadoPorId() {
