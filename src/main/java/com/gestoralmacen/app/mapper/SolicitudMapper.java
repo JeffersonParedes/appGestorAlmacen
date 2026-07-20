@@ -31,6 +31,8 @@ public class SolicitudMapper {
             solicitud.setEstado(dto.getEstado());
         }
         solicitud.setObservacion(dto.getObservacion());
+        solicitud.setNombrePropuesto(dto.getNombrePropuesto());
+        solicitud.setPrecioPropuesto(dto.getPrecioPropuesto());
         if (dto.getAprobadoPor() != null) {
             Usuario aprobador = new Usuario();
             aprobador.setId(dto.getAprobadoPor());
@@ -58,6 +60,8 @@ public class SolicitudMapper {
         dto.setReferenciaId(entity.getReferenciaId());
         dto.setEstado(entity.getEstado());
         dto.setObservacion(entity.getObservacion());
+        dto.setNombrePropuesto(entity.getNombrePropuesto());
+        dto.setPrecioPropuesto(entity.getPrecioPropuesto());
         if (entity.getAprobadoPor() != null) {
             dto.setAprobadoPorId(entity.getAprobadoPor().getId());
             dto.setNombreAprobador(entity.getAprobadoPor().getNombreCompleto());
