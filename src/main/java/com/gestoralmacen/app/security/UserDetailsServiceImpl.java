@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.Optional;
@@ -26,22 +27,29 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // 1. Buscamos primero en la tabla de usuarios de las empresas
+        // 1. Buscamos primero en la tabla de usuarios de las empresas con su Empresa unida
         Optional<Usuario> optUsuario = usuarioRepository.findByUsuario(username);
         if (optUsuario.isPresent()) {
             Usuario usuario = optUsuario.get();
 
             // Controlar que una empresa suspendida no pueda ingresar
-            if (usuario.getEmpresa() != null && !"ACTIVO".equalsIgnoreCase(usuario.getEmpresa().getEstado())) {
+            if (usuario.getEmpresa() != null && usuario.getEmpresa().getEstado() != null 
+                    && !"ACTIVO".equalsIgnoreCase(usuario.getEmpresa().getEstado())) {
                 throw new UsernameNotFoundException("La empresa del usuario se encuentra " + usuario.getEmpresa().getEstado() + ".");
             }
 
-            SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_" + usuario.getRol());
+            String rol = usuario.getRol() != null ? usuario.getRol() : "EMPLEADO";
+            String rolAuthority = rol.startsWith("ROLE_") ? rol : "ROLE_" + rol;
+            SimpleGrantedAuthority authority = new SimpleGrantedAuthority(rolAuthority);
+
+            boolean activo = usuario.getActivo() != null ? usuario.getActivo() : true;
+
             return new User(
                     usuario.getUsuario(),
                     usuario.getContrasena(),
-                    usuario.getActivo(),
+                    activo,
                     true,
                     true,
                     true,
@@ -52,14 +60,16 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         Administrador admin = administradorRepository.findByUsuario(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario o Administrador no encontrado: " + username));
 
+        boolean adminActivo = admin.getActivo() != null ? admin.getActivo() : true;
+
         SimpleGrantedAuthority authority = new SimpleGrantedAuthority("ROLE_ADMINISTRADOR");
         return new User(
                 admin.getUsuario(),
                 admin.getPassword(),
-                admin.getActivo(),
+                adminActivo,
                 true,
                 true,
                 true,
                 Collections.singletonList(authority));
     }
-}
+}

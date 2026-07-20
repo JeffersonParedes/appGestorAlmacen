@@ -18,14 +18,22 @@ public class SecurityContextHelper {
     public Long getEmpresaId() {
         String token = getTokenFromContext();
         Claims claims = jwtUtil.extraerClaims(token);
-        return claims.get("empresaId", Long.class);
+        Object val = claims.get("empresaId");
+        if (val instanceof Number) {
+            return ((Number) val).longValue();
+        }
+        return null;
     }
 
     // Método para obtener el ID del usuario del Token actual
     public Long getUsuarioId() {
         String token = getTokenFromContext();
         Claims claims = jwtUtil.extraerClaims(token);
-        return claims.get("usuarioId", Long.class);
+        Object val = claims.get("usuarioId");
+        if (val instanceof Number) {
+            return ((Number) val).longValue();
+        }
+        return null;
     }
 
     // Método para obtener el Rol del usuario del Token actual

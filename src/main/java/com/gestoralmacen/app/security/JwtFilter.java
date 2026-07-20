@@ -31,41 +31,39 @@ public class JwtFilter extends OncePerRequestFilter {
         final String authHeader = request.getHeader("Authorization");
         String username = null;
         String jwt = null;
-
-        // DIAGNÓSTICO: Ver si la petición llega y trae token
         String requestURI = request.getRequestURI();
-        System.out.println(
-                "DEBUG - Petición: " + requestURI + " | Header: " + (authHeader != null ? "Presente" : "Nulo"));
+
+        System.out.println("DEBUG JwtFilter: URI=" + requestURI + " | Header=" + (authHeader != null ? "Presente" : "NULO"));
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
             try {
                 username = jwtUtil.extraerUsername(jwt);
+                System.out.println("DEBUG JwtFilter: Username extraído de JWT = " + username);
             } catch (Exception e) {
-                // DIAGNÓSTICO: Ver el motivo real del fallo
-                System.out.println("ERROR JWT - Token inválido o expirado: " + e.getMessage());
+                System.out.println("ERROR JWT - Token inválido o expirado para " + requestURI + ": " + e.getMessage());
                 e.printStackTrace();
             }
         }
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            try {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+                if (jwtUtil.validarToken(jwt, userDetails.getUsername())) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails, jwt, userDetails.getAuthorities());
 
-            // DIAGNÓSTICO: Verificar que el username coincida
-            System.out.println("DEBUG - User en Token: " + username + " | User en DB: " + userDetails.getUsername());
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-            if (jwtUtil.validarToken(jwt, userDetails.getUsername())) {
-
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails, jwt, userDetails.getAuthorities());
-
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-                System.out.println("DEBUG - Autenticación exitosa para: " + username);
-            } else {
-                System.out.println("DEBUG - Validación de Token Fallida (posible firma incorrecta)");
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    System.out.println("DEBUG JwtFilter: Autenticación EXITOSA para = " + username + " (Roles: " + userDetails.getAuthorities() + ")");
+                } else {
+                    System.out.println("DEBUG JwtFilter: Validación de Token FALLIDA para = " + username);
+                }
+            } catch (Exception e) {
+                System.out.println("ERROR JwtFilter: No se pudo cargar usuario (" + username + "): " + e.getMessage());
+                e.printStackTrace();
             }
         }
 
