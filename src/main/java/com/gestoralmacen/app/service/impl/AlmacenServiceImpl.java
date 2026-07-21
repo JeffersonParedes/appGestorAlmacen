@@ -34,8 +34,7 @@ public class AlmacenServiceImpl implements AlmacenService {
     @Transactional(readOnly = true)
     public List<AlmacenResponseDTO> listarPorEmpresa(Long empresaId) {
         return almacenRepository.findByEmpresaId(empresaId).stream()
-                .filter(almacen -> !almacen.getEstado().equals("INACTIVO")) // Filtramos los inactivos manualmente si no
-                                                                            // hay un findByEmpresaIdAndEstado
+                .filter(almacen -> !"INACTIVO".equalsIgnoreCase(almacen.getEstado()))
                 .map(almacenMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -45,6 +44,17 @@ public class AlmacenServiceImpl implements AlmacenService {
     public AlmacenResponseDTO crearAlmacen(AlmacenRequestDTO requestDTO, Long empresaId) {
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
+
+        String nombre = requestDTO.getNombre() != null ? requestDTO.getNombre().trim() : "";
+        String direccion = requestDTO.getDireccion() != null ? requestDTO.getDireccion().trim() : "";
+
+        if (almacenRepository.existsByEmpresaIdAndNombreIgnoreCase(empresaId, nombre)) {
+            throw new ReglaNegocioException("El nombre del almacén ya se encuentra registrado.");
+        }
+
+        if (!direccion.isEmpty() && almacenRepository.existsByEmpresaIdAndDireccionIgnoreCase(empresaId, direccion)) {
+            throw new ReglaNegocioException("La dirección del almacén ya se encuentra registrada.");
+        }
 
         Almacen nuevoAlmacen = almacenMapper.toEntity(requestDTO);
         nuevoAlmacen.setEmpresa(empresa);
@@ -77,8 +87,19 @@ public class AlmacenServiceImpl implements AlmacenService {
             throw new ReglaNegocioException("No tienes permiso sobre este almacén.");
         }
 
-        almacen.setNombre(requestDTO.getNombre());
-        almacen.setDireccion(requestDTO.getDireccion());
+        String nombre = requestDTO.getNombre() != null ? requestDTO.getNombre().trim() : "";
+        String direccion = requestDTO.getDireccion() != null ? requestDTO.getDireccion().trim() : "";
+
+        if (almacenRepository.existsByEmpresaIdAndNombreIgnoreCaseAndIdNot(empresaId, nombre, id)) {
+            throw new ReglaNegocioException("El nombre del almacén ya se encuentra registrado.");
+        }
+
+        if (!direccion.isEmpty() && almacenRepository.existsByEmpresaIdAndDireccionIgnoreCaseAndIdNot(empresaId, direccion, id)) {
+            throw new ReglaNegocioException("La dirección del almacén ya se encuentra registrada.");
+        }
+
+        almacen.setNombre(nombre);
+        almacen.setDireccion(direccion);
 
         Almacen guardado = almacenRepository.save(almacen);
         return almacenMapper.toResponse(guardado);
@@ -104,4 +125,3 @@ public class AlmacenServiceImpl implements AlmacenService {
         eliminarAlmacen(id, empresaId);
     }
 }
-

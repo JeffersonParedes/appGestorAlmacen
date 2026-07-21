@@ -8,12 +8,11 @@ public class ProductoResponseDTO {
     private String nombre;
     private String descripcion;
     private BigDecimal precio;
+    private BigDecimal stockMinimo;
     private String imagenUrl;
     private String estadoAprobacion;
     private String estado;
 
-    // Devolvemos objetos DTO anidados para no mandar la entidad completa de
-    // Categoría
     private CategoriaResponseDTO categoria;
 
     // Getters y Setters
@@ -55,6 +54,14 @@ public class ProductoResponseDTO {
 
     public void setPrecio(BigDecimal precio) {
         this.precio = precio;
+    }
+
+    public BigDecimal getStockMinimo() {
+        return stockMinimo;
+    }
+
+    public void setStockMinimo(BigDecimal stockMinimo) {
+        this.stockMinimo = stockMinimo;
     }
 
     public String getImagenUrl() {

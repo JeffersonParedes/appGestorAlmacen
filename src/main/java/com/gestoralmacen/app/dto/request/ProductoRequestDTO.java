@@ -24,6 +24,9 @@ public class ProductoRequestDTO {
     @Min(value = 0, message = "El precio no puede ser negativo")
     private BigDecimal precio;
 
+    @Min(value = 0, message = "El stock mínimo no puede ser negativo")
+    private BigDecimal stockMinimo;
+
     private String imagenUrl;
 
     // Getters y Setters
@@ -65,6 +68,14 @@ public class ProductoRequestDTO {
 
     public void setPrecio(BigDecimal precio) {
         this.precio = precio;
+    }
+
+    public BigDecimal getStockMinimo() {
+        return stockMinimo;
+    }
+
+    public void setStockMinimo(BigDecimal stockMinimo) {
+        this.stockMinimo = stockMinimo;
     }
 
     public String getImagenUrl() {

@@ -10,18 +10,16 @@ public class SuscripcionRequestDTO {
     @NotNull(message = "El ID de la empresa es obligatorio")
     private Long empresaId;
 
-    @NotNull(message = "La fecha de inicio es obligatoria")
-    private LocalDate fechaInicio;
+    private String planSuscripcion; // BASICO | PRO | PREMIUM
+    private String tipoSuscripcion; // PRIMER_REGISTRO | RENOVACION
 
-    @NotNull(message = "La fecha de fin es obligatoria")
+    private LocalDate fechaInicio;
     private LocalDate fechaFin;
 
-    @NotNull(message = "El monto pagado es obligatorio")
     @PositiveOrZero(message = "El monto pagado debe ser positivo o cero")
     private BigDecimal montoPagado;
 
     private String estadoPago; // PENDIENTE | PAGADO | VENCIDO
-
     private String metodoPago;
 
     public SuscripcionRequestDTO() {
@@ -33,6 +31,22 @@ public class SuscripcionRequestDTO {
 
     public void setEmpresaId(Long empresaId) {
         this.empresaId = empresaId;
+    }
+
+    public String getPlanSuscripcion() {
+        return planSuscripcion;
+    }
+
+    public void setPlanSuscripcion(String planSuscripcion) {
+        this.planSuscripcion = planSuscripcion;
+    }
+
+    public String getTipoSuscripcion() {
+        return tipoSuscripcion;
+    }
+
+    public void setTipoSuscripcion(String tipoSuscripcion) {
+        this.tipoSuscripcion = tipoSuscripcion;
     }
 
     public LocalDate getFechaInicio() {

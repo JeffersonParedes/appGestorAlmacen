@@ -8,6 +8,13 @@ import java.util.Optional;
 
 @Repository
 public interface EmpresaRepository extends JpaRepository<Empresa, Long> {
-    // Útil para que ustedes como Admin busquen a un cliente por su RUC
+    
+    // Búsqueda por RUC
     Optional<Empresa> findByRuc(String ruc);
+
+    // Verificaciones de existencia / duplicados para el Registro SaaS
+    boolean existsByRuc(String ruc);
+    boolean existsByCorreoContacto(String correoContacto);
+    boolean existsByTelefonoContacto(String telefonoContacto);
+    boolean existsByDireccionPrincipal(String direccionPrincipal);
 }

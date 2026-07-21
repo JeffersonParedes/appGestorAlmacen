@@ -22,6 +22,7 @@ public class ProductoMapper {
         producto.setNombre(dto.getNombre());
         producto.setDescripcion(dto.getDescripcion());
         producto.setPrecio(dto.getPrecio());
+        producto.setStockMinimo(dto.getStockMinimo());
         producto.setImagenUrl(dto.getImagenUrl());
         return producto;
     }
@@ -35,6 +36,7 @@ public class ProductoMapper {
         dto.setNombre(entity.getNombre());
         dto.setDescripcion(entity.getDescripcion());
         dto.setPrecio(entity.getPrecio());
+        dto.setStockMinimo(entity.getStockMinimo());
         dto.setImagenUrl(entity.getImagenUrl());
         dto.setEstadoAprobacion(entity.getEstadoAprobacion());
         dto.setEstado(entity.getEstado());

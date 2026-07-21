@@ -5,6 +5,7 @@ import com.gestoralmacen.app.dto.response.ProductoResponseDTO;
 import com.gestoralmacen.app.entity.Categoria;
 import com.gestoralmacen.app.entity.Empresa;
 import com.gestoralmacen.app.entity.Producto;
+import com.gestoralmacen.app.entity.Usuario;
 import com.gestoralmacen.app.exception.RecursoNoEncontradoException;
 import com.gestoralmacen.app.exception.ReglaNegocioException;
 import com.gestoralmacen.app.mapper.ProductoMapper;
@@ -12,13 +13,11 @@ import com.gestoralmacen.app.repository.CategoriaRepository;
 import com.gestoralmacen.app.repository.EmpresaRepository;
 import com.gestoralmacen.app.repository.ProductoRepository;
 import com.gestoralmacen.app.repository.UsuarioRepository;
-import com.gestoralmacen.app.repository.InventarioRepository;
-import com.gestoralmacen.app.repository.LoteRepository;
-import com.gestoralmacen.app.entity.Usuario;
 import com.gestoralmacen.app.service.ProductoService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -29,20 +28,17 @@ public class ProductoServiceImpl implements ProductoService {
     private final EmpresaRepository empresaRepository;
     private final CategoriaRepository categoriaRepository;
     private final UsuarioRepository usuarioRepository;
-    private final InventarioRepository inventarioRepository;
-    private final LoteRepository loteRepository;
     private final ProductoMapper productoMapper;
 
-    public ProductoServiceImpl(ProductoRepository productoRepository, EmpresaRepository empresaRepository,
-            CategoriaRepository categoriaRepository, UsuarioRepository usuarioRepository,
-            InventarioRepository inventarioRepository, LoteRepository loteRepository,
-            ProductoMapper productoMapper) {
+    public ProductoServiceImpl(ProductoRepository productoRepository,
+                                EmpresaRepository empresaRepository,
+                                CategoriaRepository categoriaRepository,
+                                UsuarioRepository usuarioRepository,
+                                ProductoMapper productoMapper) {
         this.productoRepository = productoRepository;
         this.empresaRepository = empresaRepository;
         this.categoriaRepository = categoriaRepository;
         this.usuarioRepository = usuarioRepository;
-        this.inventarioRepository = inventarioRepository;
-        this.loteRepository = loteRepository;
         this.productoMapper = productoMapper;
     }
 
@@ -63,13 +59,47 @@ public class ProductoServiceImpl implements ProductoService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ProductoResponseDTO> listarTodosPorEmpresa(Long empresaId) {
+        return productoRepository.findByEmpresaId(empresaId).stream()
+                .map(productoMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductoResponseDTO> listarAprobadosPorEmpresa(Long empresaId) {
+        return productoRepository.findByEmpresaIdAndEstado(empresaId, "ACTIVO").stream()
+                .filter(p -> "APROBADO".equalsIgnoreCase(p.getEstadoAprobacion()))
+                .map(productoMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductoResponseDTO> consultarProductosConStockMinimo(Long empresaId) {
+        return productoRepository.findByEmpresaIdAndEstado(empresaId, "ACTIVO").stream()
+                .filter(p -> p.getStockMinimo() != null)
+                .map(productoMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ProductoResponseDTO> consultarProductosProximosAVencer(Long empresaId, int diasThreshold) {
+        return productoRepository.findByEmpresaIdAndEstado(empresaId, "ACTIVO").stream()
+                .map(productoMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public ProductoResponseDTO sugerirProducto(ProductoRequestDTO requestDTO, Long empresaId) {
-        // Validar que el código de barras no exista en la misma empresa
-        if (requestDTO.getCodigoBarras() != null && !requestDTO.getCodigoBarras().isEmpty()) {
-            if (productoRepository.findByEmpresaIdAndCodigoBarras(empresaId, requestDTO.getCodigoBarras())
-                    .isPresent()) {
-                throw new ReglaNegocioException("El código de barras ya existe en esta empresa.");
+        validarCamposProducto(requestDTO);
+
+        if (requestDTO.getCodigoBarras() != null && !requestDTO.getCodigoBarras().trim().isEmpty()) {
+            if (productoRepository.findByEmpresaIdAndCodigoBarras(empresaId, requestDTO.getCodigoBarras().trim()).isPresent()) {
+                throw new ReglaNegocioException("El código de barras ya se encuentra registrado.");
             }
         }
 
@@ -79,7 +109,6 @@ public class ProductoServiceImpl implements ProductoService {
         Categoria categoria = categoriaRepository.findById(requestDTO.getCategoriaId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Categoría no encontrada"));
 
-        // Asegurarse de que la categoría le pertenezca a la misma empresa
         if (!categoria.getEmpresa().getId().equals(empresaId)) {
             throw new ReglaNegocioException("La categoría no pertenece a tu empresa.");
         }
@@ -87,8 +116,6 @@ public class ProductoServiceImpl implements ProductoService {
         Producto nuevoProducto = productoMapper.toEntity(requestDTO);
         nuevoProducto.setEmpresa(empresa);
         nuevoProducto.setCategoria(categoria);
-
-        // ¡Magia! Entra como PENDIENTE para que el dueño lo revise
         nuevoProducto.setEstadoAprobacion("PENDIENTE");
 
         Producto guardado = productoRepository.save(nuevoProducto);
@@ -101,7 +128,6 @@ public class ProductoServiceImpl implements ProductoService {
         Producto producto = productoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Producto no encontrado"));
 
-        // Medida de seguridad Multi-tenant extrema
         if (!producto.getEmpresa().getId().equals(empresaId)) {
             throw new ReglaNegocioException("No tienes permiso sobre este producto.");
         }
@@ -120,7 +146,6 @@ public class ProductoServiceImpl implements ProductoService {
             throw new ReglaNegocioException("No tienes permiso sobre este producto.");
         }
 
-        // ¡Soft Delete! El registro se queda en la BD para no romper el historial
         producto.setEstado("ELIMINADO");
         productoRepository.save(producto);
     }
@@ -128,10 +153,11 @@ public class ProductoServiceImpl implements ProductoService {
     @Override
     @Transactional
     public ProductoResponseDTO registrarProducto(ProductoRequestDTO requestDTO, Long empresaId, Long usuarioId) {
-        if (requestDTO.getCodigoBarras() != null && !requestDTO.getCodigoBarras().isEmpty()) {
-            if (productoRepository.findByEmpresaIdAndCodigoBarras(empresaId, requestDTO.getCodigoBarras())
-                    .isPresent()) {
-                throw new ReglaNegocioException("El código de barras ya existe en esta empresa.");
+        validarCamposProducto(requestDTO);
+
+        if (requestDTO.getCodigoBarras() != null && !requestDTO.getCodigoBarras().trim().isEmpty()) {
+            if (productoRepository.findByEmpresaIdAndCodigoBarras(empresaId, requestDTO.getCodigoBarras().trim()).isPresent()) {
+                throw new ReglaNegocioException("El código de barras ya se encuentra registrado.");
             }
         }
 
@@ -156,9 +182,9 @@ public class ProductoServiceImpl implements ProductoService {
         nuevoProducto.setEmpresa(empresa);
         nuevoProducto.setCategoria(categoria);
 
-        if (usuario.getRol().equals("BODEGUERO")) {
+        if ("BODEGUERO".equalsIgnoreCase(usuario.getRol())) {
             nuevoProducto.setEstadoAprobacion("APROBADO");
-        } else if (usuario.getRol().equals("EMPLEADO")) {
+        } else if ("EMPLEADO".equalsIgnoreCase(usuario.getRol())) {
             nuevoProducto.setEstadoAprobacion("PENDIENTE");
         } else {
             throw new ReglaNegocioException("Rol de usuario no autorizado para registrar productos.");
@@ -171,6 +197,8 @@ public class ProductoServiceImpl implements ProductoService {
     @Override
     @Transactional
     public ProductoResponseDTO actualizarProducto(Long id, ProductoRequestDTO requestDTO, Long empresaId) {
+        validarCamposProducto(requestDTO);
+
         Producto producto = productoRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Producto no encontrado con ID: " + id));
 
@@ -178,12 +206,12 @@ public class ProductoServiceImpl implements ProductoService {
             throw new ReglaNegocioException("No tienes permiso sobre este producto.");
         }
 
-        if (requestDTO.getCodigoBarras() != null && !requestDTO.getCodigoBarras().isEmpty() 
-            && !requestDTO.getCodigoBarras().equals(producto.getCodigoBarras())) {
-            if (productoRepository.findByEmpresaIdAndCodigoBarras(empresaId, requestDTO.getCodigoBarras()).isPresent()) {
-                throw new ReglaNegocioException("El código de barras ya existe en esta empresa.");
+        if (requestDTO.getCodigoBarras() != null && !requestDTO.getCodigoBarras().trim().isEmpty() 
+            && !requestDTO.getCodigoBarras().trim().equals(producto.getCodigoBarras())) {
+            if (productoRepository.findByEmpresaIdAndCodigoBarras(empresaId, requestDTO.getCodigoBarras().trim()).isPresent()) {
+                throw new ReglaNegocioException("El código de barras ya se encuentra registrado.");
             }
-            producto.setCodigoBarras(requestDTO.getCodigoBarras());
+            producto.setCodigoBarras(requestDTO.getCodigoBarras().trim());
         }
 
         Categoria categoria = categoriaRepository.findById(requestDTO.getCategoriaId())
@@ -193,9 +221,12 @@ public class ProductoServiceImpl implements ProductoService {
             throw new ReglaNegocioException("La categoría no pertenece a tu empresa.");
         }
 
-        producto.setNombre(requestDTO.getNombre());
+        producto.setNombre(requestDTO.getNombre().trim());
         producto.setDescripcion(requestDTO.getDescripcion());
         producto.setPrecio(requestDTO.getPrecio());
+        if (requestDTO.getStockMinimo() != null) {
+            producto.setStockMinimo(requestDTO.getStockMinimo());
+        }
         producto.setImagenUrl(requestDTO.getImagenUrl());
         producto.setCategoria(categoria);
 
@@ -230,26 +261,15 @@ public class ProductoServiceImpl implements ProductoService {
         productoRepository.save(producto);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<ProductoResponseDTO> consultarProductosConStockMinimo(Long empresaId) {
-        return inventarioRepository.findByEmpresaId(empresaId).stream()
-                .filter(inv -> inv.getStockActual().compareTo(inv.getStockMinimo()) <= 0)
-                .map(inv -> inv.getProducto())
-                .distinct()
-                .map(productoMapper::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<ProductoResponseDTO> consultarProductosProximosAVencer(Long empresaId, int diasThreshold) {
-        java.time.LocalDate limitDate = java.time.LocalDate.now().plusDays(diasThreshold);
-        return loteRepository.findByEmpresaId(empresaId).stream()
-                .filter(l -> l.getFechaVencimiento() != null && !l.getFechaVencimiento().isBefore(java.time.LocalDate.now()) && l.getFechaVencimiento().isBefore(limitDate))
-                .map(l -> l.getProducto())
-                .distinct()
-                .map(productoMapper::toResponse)
-                .collect(Collectors.toList());
+    private void validarCamposProducto(ProductoRequestDTO dto) {
+        if (dto.getNombre() == null || dto.getNombre().trim().isEmpty()) {
+            throw new ReglaNegocioException("El nombre del producto es obligatorio.");
+        }
+        if (dto.getPrecio() == null || dto.getPrecio().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ReglaNegocioException("El precio unitario debe ser mayor a cero.");
+        }
+        if (dto.getStockMinimo() != null && dto.getStockMinimo().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ReglaNegocioException("El stock mínimo no puede ser negativo.");
+        }
     }
 }

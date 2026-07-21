@@ -24,7 +24,6 @@ public class UsuarioServiceImpl implements UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final EmpresaRepository empresaRepository;
     private final UsuarioMapper usuarioMapper;
-    // OJO: Luego inyectaremos PasswordEncoder de Spring Security para el Hash
     private final PasswordEncoder passwordEncoder;
 
     public UsuarioServiceImpl(UsuarioRepository usuarioRepository, EmpresaRepository empresaRepository,
@@ -46,28 +45,47 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     @Transactional
     public UsuarioResponseDTO crearUsuario(UsuarioRequestDTO requestDTO, Long empresaId, Long creadorId) {
-        // 1. Validar que el username (login) no exista ya en todo el sistema SaaS
-        if (usuarioRepository.findByUsuario(requestDTO.getUsuario()).isPresent()) {
-            throw new ReglaNegocioException("El nombre de usuario ya está en uso.");
+        String usuarioStr = requestDTO.getUsuario() != null ? requestDTO.getUsuario().trim() : "";
+        String correoStr = requestDTO.getCorreo() != null ? requestDTO.getCorreo().trim() : "";
+        String dniStr = requestDTO.getDni() != null ? requestDTO.getDni().trim() : "";
+
+        // 1. Validar nombre de usuario único
+        if (usuarioRepository.existsByUsuario(usuarioStr)) {
+            throw new ReglaNegocioException("El nombre de usuario ya se encuentra registrado.");
+        }
+
+        // 2. Validar correo único
+        if (!correoStr.isEmpty() && usuarioRepository.existsByCorreo(correoStr)) {
+            throw new ReglaNegocioException("El correo electrónico ya se encuentra registrado.");
+        }
+
+        // 3. Validar DNI único y formato (8 dígitos numéricos)
+        if (!dniStr.isEmpty()) {
+            if (dniStr.length() != 8 || !dniStr.matches("\\d+")) {
+                throw new ReglaNegocioException("El DNI debe ser numérico y contener exactamente 8 dígitos.");
+            }
+            if (usuarioRepository.existsByDni(dniStr)) {
+                throw new ReglaNegocioException("El DNI ingresado ya se encuentra registrado.");
+            }
+        }
+
+        // 4. Validar contraseña mínima de 8 caracteres
+        if (requestDTO.getContrasena() == null || requestDTO.getContrasena().length() < 8) {
+            throw new ReglaNegocioException("La contraseña debe contener al menos 8 caracteres.");
         }
 
         Usuario nuevoUsuario = usuarioMapper.toEntity(requestDTO);
-
-        // TODO: Encriptar la contraseña (lo haremos cuando configuremos Spring
-        // Security)
-        // ¡Magia de encriptación activada!
+        nuevoUsuario.setUsuario(usuarioStr);
+        nuevoUsuario.setCorreo(correoStr);
+        nuevoUsuario.setDni(dniStr);
         nuevoUsuario.setContrasena(passwordEncoder.encode(requestDTO.getContrasena()));
-        // nuevoUsuario.setContrasena(passwordEncoder.encode(requestDTO.getContrasena()));
 
-        // 2. Asociar Empresa (Si el que se crea es el Admin Supremo, empresaId vendrá
-        // nulo)
         if (empresaId != null) {
             Empresa empresa = empresaRepository.findById(empresaId)
                     .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
             nuevoUsuario.setEmpresa(empresa);
         }
 
-        // 3. Asociar al Creador (Quién registró a este usuario)
         if (creadorId != null) {
             Usuario creador = usuarioRepository.findById(creadorId)
                     .orElseThrow(() -> new RecursoNoEncontradoException("Usuario creador no encontrado"));
@@ -110,24 +128,45 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Usuario no encontrado con ID: " + id));
 
-        if (!usuario.getUsuario().equals(requestDTO.getUsuario())) {
-            if (usuarioRepository.findByUsuario(requestDTO.getUsuario()).isPresent()) {
-                throw new ReglaNegocioException("El nombre de usuario ya está en uso.");
+        String usuarioStr = requestDTO.getUsuario() != null ? requestDTO.getUsuario().trim() : "";
+        String correoStr = requestDTO.getCorreo() != null ? requestDTO.getCorreo().trim() : "";
+        String dniStr = requestDTO.getDni() != null ? requestDTO.getDni().trim() : "";
+
+        if (!usuario.getUsuario().equalsIgnoreCase(usuarioStr)) {
+            if (usuarioRepository.existsByUsuario(usuarioStr)) {
+                throw new ReglaNegocioException("El nombre de usuario ya se encuentra registrado.");
             }
-            usuario.setUsuario(requestDTO.getUsuario());
+            usuario.setUsuario(usuarioStr);
+        }
+
+        if (!correoStr.isEmpty() && !correoStr.equalsIgnoreCase(usuario.getCorreo())) {
+            if (usuarioRepository.existsByCorreo(correoStr)) {
+                throw new ReglaNegocioException("El correo electrónico ya se encuentra registrado.");
+            }
+            usuario.setCorreo(correoStr);
+        }
+
+        if (!dniStr.isEmpty() && !dniStr.equalsIgnoreCase(usuario.getDni())) {
+            if (dniStr.length() != 8 || !dniStr.matches("\\d+")) {
+                throw new ReglaNegocioException("El DNI debe ser numérico y contener exactamente 8 dígitos.");
+            }
+            if (usuarioRepository.existsByDni(dniStr)) {
+                throw new ReglaNegocioException("El DNI ingresado ya se encuentra registrado.");
+            }
+            usuario.setDni(dniStr);
         }
 
         if (requestDTO.getContrasena() != null && !requestDTO.getContrasena().trim().isEmpty()) {
+            if (requestDTO.getContrasena().length() < 8) {
+                throw new ReglaNegocioException("La contraseña debe contener al menos 8 caracteres.");
+            }
             usuario.setContrasena(passwordEncoder.encode(requestDTO.getContrasena()));
         }
 
         usuario.setNombreCompleto(requestDTO.getNombreCompleto());
         usuario.setRol(requestDTO.getRol());
-        usuario.setDni(requestDTO.getDni());
-        usuario.setCorreo(requestDTO.getCorreo());
 
         Usuario guardado = usuarioRepository.save(usuario);
         return usuarioMapper.toResponse(guardado);
     }
-
 }

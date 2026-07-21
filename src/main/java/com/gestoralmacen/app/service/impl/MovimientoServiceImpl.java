@@ -72,7 +72,7 @@ public class MovimientoServiceImpl implements MovimientoService {
     @Override
     @Transactional
     public MovimientoResponseDTO registrarMovimiento(MovimientoRequestDTO dto, Long empresaId, Long usuarioId) {
-        String tipo = dto.getTipoMovimiento().toUpperCase();
+        String tipo = dto.getTipoMovimiento() != null ? dto.getTipoMovimiento().toUpperCase() : "";
         switch (tipo) {
             case "ENTRADA":
             case "DEVOLUCION_CLIENTE":
@@ -91,9 +91,7 @@ public class MovimientoServiceImpl implements MovimientoService {
     @Override
     @Transactional
     public MovimientoResponseDTO registrarEntrada(MovimientoRequestDTO dto, Long empresaId, Long usuarioId) {
-        if (dto.getCantidad().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ReglaNegocioException("La cantidad debe ser mayor a 0.");
-        }
+        validarCantidadEnteraPositiva(dto.getCantidad());
 
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
@@ -107,7 +105,7 @@ public class MovimientoServiceImpl implements MovimientoService {
         if (!producto.getEmpresa().getId().equals(empresaId) || !almacen.getEmpresa().getId().equals(empresaId)) {
             throw new ReglaNegocioException("El producto o almacén no pertenecen a esta empresa.");
         }
-        if (!producto.getEstadoAprobacion().equals("APROBADO")) {
+        if (!"APROBADO".equalsIgnoreCase(producto.getEstadoAprobacion())) {
             throw new ReglaNegocioException("El producto no está aprobado.");
         }
 
@@ -141,7 +139,7 @@ public class MovimientoServiceImpl implements MovimientoService {
         movimiento.setProducto(producto);
         movimiento.setAlmacen(almacen);
         movimiento.setLote(lote);
-        movimiento.setTipoMovimiento(dto.getTipoMovimiento().toUpperCase());
+        movimiento.setTipoMovimiento("ENTRADA");
         HistorialMovimientos guardado = movimientosRepository.save(movimiento);
 
         Auditoria auditoria = new Auditoria();
@@ -159,9 +157,7 @@ public class MovimientoServiceImpl implements MovimientoService {
     @Override
     @Transactional
     public MovimientoResponseDTO registrarSalida(MovimientoRequestDTO dto, Long empresaId, Long usuarioId) {
-        if (dto.getCantidad().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ReglaNegocioException("La cantidad debe ser mayor a 0.");
-        }
+        validarCantidadEnteraPositiva(dto.getCantidad());
 
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
@@ -175,16 +171,16 @@ public class MovimientoServiceImpl implements MovimientoService {
         if (!producto.getEmpresa().getId().equals(empresaId) || !almacen.getEmpresa().getId().equals(empresaId)) {
             throw new ReglaNegocioException("El producto o almacén no pertenecen a esta empresa.");
         }
-        if (!producto.getEstadoAprobacion().equals("APROBADO")) {
+        if (!"APROBADO".equalsIgnoreCase(producto.getEstadoAprobacion())) {
             throw new ReglaNegocioException("El producto no está aprobado.");
         }
 
         Inventario inventario = inventarioRepository
                 .findByEmpresaIdAndProductoIdAndAlmacenId(empresaId, producto.getId(), almacen.getId())
-                .orElseThrow(() -> new ReglaNegocioException("No hay inventario registrado para este producto en este almacén."));
+                .orElseThrow(() -> new ReglaNegocioException("No existe suficiente stock disponible."));
 
         if (inventario.getStockActual().compareTo(dto.getCantidad()) < 0) {
-            throw new ReglaNegocioException("Stock insuficiente en el almacén. Disponible: " + inventario.getStockActual());
+            throw new ReglaNegocioException("No existe suficiente stock disponible.");
         }
 
         Lote lote = null;
@@ -195,7 +191,7 @@ public class MovimientoServiceImpl implements MovimientoService {
                 throw new ReglaNegocioException("El lote no pertenece a este producto.");
             }
             if (lote.getCantidadActual().compareTo(dto.getCantidad()) < 0) {
-                throw new ReglaNegocioException("Cantidad insuficiente en el lote. Disponible: " + lote.getCantidadActual());
+                throw new ReglaNegocioException("No existe suficiente stock disponible.");
             }
             lote.setCantidadActual(lote.getCantidadActual().subtract(dto.getCantidad()));
             loteRepository.save(lote);
@@ -228,9 +224,8 @@ public class MovimientoServiceImpl implements MovimientoService {
     @Override
     @Transactional
     public MovimientoResponseDTO registrarTraslado(MovimientoRequestDTO dto, Long empresaId, Long usuarioId) {
-        if (dto.getCantidad().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ReglaNegocioException("La cantidad debe ser mayor a 0.");
-        }
+        validarCantidadEnteraPositiva(dto.getCantidad());
+
         if (dto.getDestinoAlmacenId() == null) {
             throw new ReglaNegocioException("El almacén de destino es obligatorio para traslados.");
         }
@@ -257,11 +252,24 @@ public class MovimientoServiceImpl implements MovimientoService {
 
         Inventario invOrigen = inventarioRepository
                 .findByEmpresaIdAndProductoIdAndAlmacenId(empresaId, producto.getId(), almacenOrigen.getId())
-                .orElseThrow(() -> new ReglaNegocioException("No hay stock registrado en el almacén de origen."));
+                .orElseThrow(() -> new ReglaNegocioException("No existe suficiente stock disponible."));
 
         if (invOrigen.getStockActual().compareTo(dto.getCantidad()) < 0) {
-            throw new ReglaNegocioException("Stock insuficiente en el almacén de origen. Disponible: " + invOrigen.getStockActual());
+            throw new ReglaNegocioException("No existe suficiente stock disponible.");
         }
+
+        Lote lote = null;
+        if (dto.getLoteId() != null) {
+            lote = loteRepository.findById(dto.getLoteId())
+                    .orElseThrow(() -> new RecursoNoEncontradoException("Lote no encontrado"));
+            if (!lote.getProducto().getId().equals(producto.getId())) {
+                throw new ReglaNegocioException("El lote no pertenece a este producto.");
+            }
+            if (lote.getCantidadActual().compareTo(dto.getCantidad()) < 0) {
+                throw new ReglaNegocioException("No existe suficiente stock disponible.");
+            }
+        }
+
         invOrigen.setStockActual(invOrigen.getStockActual().subtract(dto.getCantidad()));
         inventarioRepository.save(invOrigen);
 
@@ -277,15 +285,6 @@ public class MovimientoServiceImpl implements MovimientoService {
                 });
         invDestino.setStockActual(invDestino.getStockActual().add(dto.getCantidad()));
         inventarioRepository.save(invDestino);
-
-        Lote lote = null;
-        if (dto.getLoteId() != null) {
-            lote = loteRepository.findById(dto.getLoteId())
-                    .orElseThrow(() -> new RecursoNoEncontradoException("Lote no encontrado"));
-            if (!lote.getProducto().getId().equals(producto.getId())) {
-                throw new ReglaNegocioException("El lote no pertenece a este producto.");
-            }
-        }
 
         HistorialMovimientos movOrigen = new HistorialMovimientos();
         movOrigen.setEmpresa(empresa);
@@ -324,6 +323,10 @@ public class MovimientoServiceImpl implements MovimientoService {
     @Override
     @Transactional
     public MovimientoResponseDTO registrarAjuste(MovimientoRequestDTO dto, Long empresaId, Long usuarioId) {
+        if (dto.getCantidad() == null || dto.getCantidad().compareTo(BigDecimal.ZERO) < 0 || dto.getCantidad().remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0) {
+            throw new ReglaNegocioException("La cantidad sólo permite números enteros.");
+        }
+
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
         Usuario usuario = usuarioRepository.findById(usuarioId)
@@ -384,5 +387,11 @@ public class MovimientoServiceImpl implements MovimientoService {
         auditoriaRepository.save(auditoria);
 
         return movimientoMapper.toResponse(guardado);
+    }
+
+    private void validarCantidadEnteraPositiva(BigDecimal cantidad) {
+        if (cantidad == null || cantidad.compareTo(BigDecimal.ZERO) <= 0 || cantidad.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) != 0) {
+            throw new ReglaNegocioException("La cantidad sólo permite números enteros mayores a cero.");
+        }
     }
 }

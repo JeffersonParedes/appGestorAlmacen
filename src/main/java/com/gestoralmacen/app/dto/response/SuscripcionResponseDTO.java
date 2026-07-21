@@ -9,6 +9,8 @@ public class SuscripcionResponseDTO {
     private Long id;
     private Long empresaId;
     private String razonSocialEmpresa;
+    private String planSuscripcion;
+    private String tipoSuscripcion;
     private LocalDate fechaInicio;
     private LocalDate fechaFin;
     private BigDecimal montoPagado;
@@ -41,6 +43,22 @@ public class SuscripcionResponseDTO {
 
     public void setRazonSocialEmpresa(String razonSocialEmpresa) {
         this.razonSocialEmpresa = razonSocialEmpresa;
+    }
+
+    public String getPlanSuscripcion() {
+        return planSuscripcion;
+    }
+
+    public void setPlanSuscripcion(String planSuscripcion) {
+        this.planSuscripcion = planSuscripcion;
+    }
+
+    public String getTipoSuscripcion() {
+        return tipoSuscripcion;
+    }
+
+    public void setTipoSuscripcion(String tipoSuscripcion) {
+        this.tipoSuscripcion = tipoSuscripcion;
     }
 
     public LocalDate getFechaInicio() {

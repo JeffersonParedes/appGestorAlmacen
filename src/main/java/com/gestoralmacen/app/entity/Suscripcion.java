@@ -16,6 +16,12 @@ public class Suscripcion {
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;
 
+    @Column(name = "plan_suscripcion", nullable = false, length = 30)
+    private String planSuscripcion = "BASICO";
+
+    @Column(name = "tipo_suscripcion", nullable = false, length = 30)
+    private String tipoSuscripcion = "PRIMER_REGISTRO";
+
     @Column(name = "fecha_inicio", nullable = false)
     private LocalDate fechaInicio;
 
@@ -57,6 +63,22 @@ public class Suscripcion {
 
     public void setEmpresa(Empresa empresa) {
         this.empresa = empresa;
+    }
+
+    public String getPlanSuscripcion() {
+        return planSuscripcion;
+    }
+
+    public void setPlanSuscripcion(String planSuscripcion) {
+        this.planSuscripcion = planSuscripcion;
+    }
+
+    public String getTipoSuscripcion() {
+        return tipoSuscripcion;
+    }
+
+    public void setTipoSuscripcion(String tipoSuscripcion) {
+        this.tipoSuscripcion = tipoSuscripcion;
     }
 
     public LocalDate getFechaInicio() {

@@ -61,36 +61,85 @@ public class AdministradorServiceImpl implements AdministradorService {
                                                     Double montoPago, 
                                                     Integer duracionMeses) {
         
-        if (empresaRepository.findByRuc(empresaDTO.getRuc()).isPresent()) {
-            throw new ReglaNegocioException("La empresa con RUC: " + empresaDTO.getRuc() + " ya existe.");
+        // 1. Validaciones de Duplicados de Empresa
+        if (empresaDTO.getRuc() != null && empresaRepository.existsByRuc(empresaDTO.getRuc().trim())) {
+            throw new ReglaNegocioException("RUC ya registrado.");
+        }
+        if (empresaDTO.getCorreoContacto() != null && !empresaDTO.getCorreoContacto().trim().isEmpty() 
+                && empresaRepository.existsByCorreoContacto(empresaDTO.getCorreoContacto().trim())) {
+            throw new ReglaNegocioException("El correo empresarial ya existe.");
+        }
+        if (empresaDTO.getTelefonoContacto() != null && !empresaDTO.getTelefonoContacto().trim().isEmpty() 
+                && empresaRepository.existsByTelefonoContacto(empresaDTO.getTelefonoContacto().trim())) {
+            throw new ReglaNegocioException("El número telefónico ya pertenece a otra empresa.");
+        }
+        if (empresaDTO.getDireccionPrincipal() != null && !empresaDTO.getDireccionPrincipal().trim().isEmpty() 
+                && empresaRepository.existsByDireccionPrincipal(empresaDTO.getDireccionPrincipal().trim())) {
+            throw new ReglaNegocioException("La dirección ingresada ya se encuentra registrada.");
         }
 
-        if (usuarioRepository.findByUsuario(usuarioBodeguero).isPresent()) {
-            throw new ReglaNegocioException("El nombre de usuario para el bodeguero ya está en uso: " + usuarioBodeguero);
+        // 2. Validaciones de Duplicados de Usuario Bodeguero
+        if (usuarioBodeguero != null && usuarioRepository.existsByUsuario(usuarioBodeguero.trim())) {
+            throw new ReglaNegocioException("El usuario ya se encuentra registrado.");
+        }
+        if (correoBodeguero != null && !correoBodeguero.trim().isEmpty() 
+                && usuarioRepository.existsByCorreo(correoBodeguero.trim())) {
+            throw new ReglaNegocioException("El correo electrónico ya existe.");
+        }
+        if (dniBodeguero != null && !dniBodeguero.trim().isEmpty() 
+                && usuarioRepository.existsByDni(dniBodeguero.trim())) {
+            throw new ReglaNegocioException("El DNI ingresado ya pertenece a otro usuario.");
         }
 
+        // 3. Creación y persistencia de Empresa
         Empresa empresa = empresaMapper.toEntity(empresaDTO);
         empresa.setEstado("ACTIVO");
         Empresa empresaGuardada = empresaRepository.save(empresa);
 
+        // 4. Creación y persistencia de Usuario Bodeguero
         Usuario bodeguero = new Usuario();
-        bodeguero.setUsuario(usuarioBodeguero);
-        bodeguero.setCorreo(correoBodeguero);
+        bodeguero.setUsuario(usuarioBodeguero != null ? usuarioBodeguero.trim() : "");
+        bodeguero.setCorreo(correoBodeguero != null ? correoBodeguero.trim() : "");
         bodeguero.setContrasena(passwordEncoder.encode(contrasenaBodeguero));
-        bodeguero.setDni(dniBodeguero);
-        bodeguero.setNombreCompleto(nombreBodeguero);
+        bodeguero.setDni(dniBodeguero != null ? dniBodeguero.trim() : "");
+        bodeguero.setNombreCompleto(nombreBodeguero != null ? nombreBodeguero.trim() : "");
         bodeguero.setRol("BODEGUERO");
         bodeguero.setActivo(true);
         bodeguero.setEmpresa(empresaGuardada);
         usuarioRepository.save(bodeguero);
 
+        // 5. Normalización de Plan y Cálculos Automáticos de Tarifas/Fechas
+        String planStr = (planSuscripcion != null) ? planSuscripcion.toUpperCase() : "BASICO";
+        String planFinal = "BASICO";
+        BigDecimal montoFinal = new BigDecimal("15.00");
+        int mesesDuracion = 1;
+
+        if (planStr.contains("PREMIUM")) {
+            planFinal = "PREMIUM";
+            montoFinal = new BigDecimal("150.00");
+            mesesDuracion = 12;
+        } else if (planStr.contains("PRO")) {
+            planFinal = "PRO";
+            montoFinal = new BigDecimal("85.00");
+            mesesDuracion = 6;
+        } else {
+            planFinal = "BASICO";
+            montoFinal = new BigDecimal("15.00");
+            mesesDuracion = 1;
+        }
+
+        LocalDate fechaInicio = LocalDate.now();
+        LocalDate fechaFin = fechaInicio.plusMonths(mesesDuracion);
+
         Suscripcion suscripcion = new Suscripcion();
         suscripcion.setEmpresa(empresaGuardada);
-        suscripcion.setMetodoPago(planSuscripcion);
-        suscripcion.setFechaInicio(LocalDate.now());
-        suscripcion.setFechaFin(LocalDate.now().plusMonths(duracionMeses != null ? duracionMeses : 12));
+        suscripcion.setPlanSuscripcion(planFinal);
+        suscripcion.setTipoSuscripcion("PRIMER_REGISTRO");
+        suscripcion.setMetodoPago(planSuscripcion != null ? planSuscripcion : "TRANSFERENCIA");
+        suscripcion.setFechaInicio(fechaInicio);
+        suscripcion.setFechaFin(fechaFin);
         suscripcion.setEstadoPago("PAGADO");
-        suscripcion.setMontoPagado(BigDecimal.valueOf(montoPago != null ? montoPago : 0.0));
+        suscripcion.setMontoPagado(montoFinal);
         suscripcionRepository.save(suscripcion);
 
         return empresaMapper.toResponse(empresaGuardada);

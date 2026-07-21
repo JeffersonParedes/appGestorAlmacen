@@ -19,6 +19,12 @@ public class SuscripcionMapper {
             empresa.setId(dto.getEmpresaId());
             suscripcion.setEmpresa(empresa);
         }
+        if (dto.getPlanSuscripcion() != null) {
+            suscripcion.setPlanSuscripcion(dto.getPlanSuscripcion());
+        }
+        if (dto.getTipoSuscripcion() != null) {
+            suscripcion.setTipoSuscripcion(dto.getTipoSuscripcion());
+        }
         suscripcion.setFechaInicio(dto.getFechaInicio());
         suscripcion.setFechaFin(dto.getFechaFin());
         suscripcion.setMontoPagado(dto.getMontoPagado());
@@ -39,6 +45,8 @@ public class SuscripcionMapper {
             dto.setEmpresaId(entity.getEmpresa().getId());
             dto.setRazonSocialEmpresa(entity.getEmpresa().getRazonSocial());
         }
+        dto.setPlanSuscripcion(entity.getPlanSuscripcion());
+        dto.setTipoSuscripcion(entity.getTipoSuscripcion());
         dto.setFechaInicio(entity.getFechaInicio());
         dto.setFechaFin(entity.getFechaFin());
         dto.setMontoPagado(entity.getMontoPagado());

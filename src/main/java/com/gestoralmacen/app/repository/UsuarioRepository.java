@@ -18,4 +18,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     // Para que el dueño vea la lista de sus empleados
     List<Usuario> findByEmpresaId(Long empresaId);
+
+    // Verificaciones de duplicados
+    boolean existsByUsuario(String usuario);
+    boolean existsByCorreo(String correo);
+    boolean existsByDni(String dni);
 }

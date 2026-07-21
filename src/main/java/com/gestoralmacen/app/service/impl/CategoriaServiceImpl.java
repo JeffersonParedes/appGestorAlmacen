@@ -48,6 +48,12 @@ public class CategoriaServiceImpl implements CategoriaService {
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
 
+        String nombre = requestDTO.getNombre() != null ? requestDTO.getNombre().trim() : "";
+
+        if (categoriaRepository.findByEmpresaIdAndNombre(empresaId, nombre).isPresent()) {
+            throw new ReglaNegocioException("La categoría ya se encuentra registrada.");
+        }
+
         Categoria nuevaCategoria = categoriaMapper.toEntity(requestDTO);
         nuevaCategoria.setEmpresa(empresa);
         nuevaCategoria.setEstadoAprobacion("PENDIENTE");
@@ -97,9 +103,11 @@ public class CategoriaServiceImpl implements CategoriaService {
             throw new ReglaNegocioException("El usuario no pertenece a la misma empresa.");
         }
 
+        String nombre = requestDTO.getNombre() != null ? requestDTO.getNombre().trim() : "";
+
         // Validar que el nombre no exista en la misma empresa
-        if (categoriaRepository.findByEmpresaIdAndNombre(empresaId, requestDTO.getNombre()).isPresent()) {
-            throw new ReglaNegocioException("La categoría con ese nombre ya existe en esta empresa.");
+        if (categoriaRepository.findByEmpresaIdAndNombre(empresaId, nombre).isPresent()) {
+            throw new ReglaNegocioException("La categoría ya se encuentra registrada.");
         }
 
         Categoria nuevaCategoria = categoriaMapper.toEntity(requestDTO);
@@ -127,7 +135,15 @@ public class CategoriaServiceImpl implements CategoriaService {
             throw new ReglaNegocioException("No tienes permiso sobre esta categoría.");
         }
 
-        categoria.setNombre(requestDTO.getNombre());
+        String nombre = requestDTO.getNombre() != null ? requestDTO.getNombre().trim() : "";
+
+        categoriaRepository.findByEmpresaIdAndNombre(empresaId, nombre).ifPresent(c -> {
+            if (!c.getId().equals(id)) {
+                throw new ReglaNegocioException("La categoría ya se encuentra registrada.");
+            }
+        });
+
+        categoria.setNombre(nombre);
         categoria.setDescripcion(requestDTO.getDescripcion());
 
         Categoria guardada = categoriaRepository.save(categoria);

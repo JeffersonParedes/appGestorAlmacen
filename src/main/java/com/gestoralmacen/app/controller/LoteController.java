@@ -26,7 +26,8 @@ public class LoteController {
     @PostMapping
     public ResponseEntity<LoteResponseDTO> crearLote(@Valid @RequestBody LoteRequestDTO requestDTO) {
         Long empresaId = securityHelper.getEmpresaId();
-        LoteResponseDTO response = loteService.crearLote(requestDTO, empresaId);
+        Long usuarioId = securityHelper.getUsuarioId();
+        LoteResponseDTO response = loteService.crearLote(requestDTO, empresaId, usuarioId);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 

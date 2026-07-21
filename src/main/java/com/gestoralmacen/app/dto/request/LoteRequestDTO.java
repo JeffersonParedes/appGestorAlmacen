@@ -15,6 +15,8 @@ public class LoteRequestDTO {
     @NotNull(message = "El ID del producto es obligatorio")
     private Long productoId;
 
+    private Long almacenId;
+
     @NotBlank(message = "El número de lote es obligatorio")
     @Size(max = 50, message = "El número de lote no puede exceder los 50 caracteres")
     private String numeroLote;
@@ -51,6 +53,14 @@ public class LoteRequestDTO {
 
     public void setProductoId(Long productoId) {
         this.productoId = productoId;
+    }
+
+    public Long getAlmacenId() {
+        return almacenId;
+    }
+
+    public void setAlmacenId(Long almacenId) {
+        this.almacenId = almacenId;
     }
 
     public String getNumeroLote() {

@@ -17,8 +17,12 @@ import com.gestoralmacen.app.service.SuscripcionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,15 +52,43 @@ public class SuscripcionServiceImpl implements SuscripcionService {
         Empresa empresa = empresaRepository.findById(dto.getEmpresaId())
                 .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
 
-        Suscripcion suscripcion = suscripcionMapper.toEntity(dto);
+        // Normalización del plan
+        String planReq = dto.getPlanSuscripcion() != null ? dto.getPlanSuscripcion().toUpperCase() : "BASICO";
+        String planFinal = "BASICO";
+        BigDecimal montoFinal = new BigDecimal("15.00");
+        int meses = 1;
+
+        if (planReq.contains("PREMIUM")) {
+            planFinal = "PREMIUM";
+            montoFinal = new BigDecimal("150.00");
+            meses = 12;
+        } else if (planReq.contains("PRO")) {
+            planFinal = "PRO";
+            montoFinal = new BigDecimal("85.00");
+            meses = 6;
+        } else {
+            planFinal = "BASICO";
+            montoFinal = new BigDecimal("15.00");
+            meses = 1;
+        }
+
+        LocalDate inicio = dto.getFechaInicio() != null ? dto.getFechaInicio() : LocalDate.now();
+        LocalDate fin = inicio.plusMonths(meses);
+
+        Suscripcion suscripcion = new Suscripcion();
         suscripcion.setEmpresa(empresa);
+        suscripcion.setPlanSuscripcion(planFinal);
+        suscripcion.setTipoSuscripcion(dto.getTipoSuscripcion() != null ? dto.getTipoSuscripcion() : "PRIMER_REGISTRO");
+        suscripcion.setFechaInicio(inicio);
+        suscripcion.setFechaFin(fin);
+        suscripcion.setMontoPagado(montoFinal);
+        suscripcion.setEstadoPago("PAGADO");
+        suscripcion.setMetodoPago(dto.getMetodoPago() != null ? dto.getMetodoPago() : "TRANSFERENCIA");
 
         Suscripcion guardada = suscripcionRepository.save(suscripcion);
 
-        if ("PAGADO".equals(suscripcion.getEstadoPago()) && suscripcion.getFechaFin().isAfter(LocalDate.now())) {
-            empresa.setEstado("ACTIVO");
-            empresaRepository.save(empresa);
-        }
+        empresa.setEstado("ACTIVO");
+        empresaRepository.save(empresa);
 
         return suscripcionMapper.toResponse(guardada);
     }
@@ -67,13 +99,72 @@ public class SuscripcionServiceImpl implements SuscripcionService {
         Empresa empresa = empresaRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("Empresa no encontrada"));
 
-        Suscripcion suscripcion = suscripcionMapper.toEntity(dto);
-        suscripcion.setEmpresa(empresa);
-        Suscripcion guardada = suscripcionRepository.save(suscripcion);
+        // 1. Obtener la suscripción más reciente de la empresa
+        List<Suscripcion> suscripcionesPrevias = suscripcionRepository.findByEmpresaId(empresaId);
+        Optional<Suscripcion> ultimaSuscripcionOpt = suscripcionesPrevias.stream()
+                .max(Comparator.comparing(Suscripcion::getFechaFin));
+
+        LocalDate hoy = LocalDate.now();
+        Suscripcion suscripcionTarget;
+
+        if (ultimaSuscripcionOpt.isPresent()) {
+            suscripcionTarget = ultimaSuscripcionOpt.get();
+            LocalDate fechaFinActual = suscripcionTarget.getFechaFin();
+            LocalDate fechaPermitidaRenovacion = fechaFinActual.minusMonths(1);
+
+            // Regla de Negocio: Únicamente renovar cuando falte 1 mes o menos para vencer
+            if (hoy.isBefore(fechaPermitidaRenovacion)) {
+                String fechaFormateada = fechaPermitidaRenovacion.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                throw new ReglaNegocioException("No es posible realizar una renovación todavía.\nLa suscripción podrá renovarse a partir del: " + fechaFormateada + ".");
+            }
+        } else {
+            suscripcionTarget = new Suscripcion();
+            suscripcionTarget.setEmpresa(empresa);
+        }
+
+        // 2. Determinar plan y valores automáticos
+        String planReq = dto.getPlanSuscripcion() != null ? dto.getPlanSuscripcion().toUpperCase() : "BASICO";
+        String planFinal = "BASICO";
+        BigDecimal montoFinal = new BigDecimal("15.00");
+        int meses = 1;
+
+        if (planReq.contains("PREMIUM")) {
+            planFinal = "PREMIUM";
+            montoFinal = new BigDecimal("150.00");
+            meses = 12;
+        } else if (planReq.contains("PRO")) {
+            planFinal = "PRO";
+            montoFinal = new BigDecimal("85.00");
+            meses = 6;
+        } else {
+            planFinal = "BASICO";
+            montoFinal = new BigDecimal("15.00");
+            meses = 1;
+        }
+
+        LocalDate fechaInicio;
+        if (ultimaSuscripcionOpt.isPresent() && ultimaSuscripcionOpt.get().getFechaFin().isAfter(hoy)) {
+            fechaInicio = ultimaSuscripcionOpt.get().getFechaFin();
+        } else {
+            fechaInicio = hoy;
+        }
+        LocalDate fechaFin = fechaInicio.plusMonths(meses);
+
+        // Actualizar la suscripción existente en la base de datos (no crear una nueva)
+        suscripcionTarget.setPlanSuscripcion(planFinal);
+        suscripcionTarget.setTipoSuscripcion("RENOVACION");
+        suscripcionTarget.setFechaInicio(fechaInicio);
+        suscripcionTarget.setFechaFin(fechaFin);
+        suscripcionTarget.setMontoPagado(montoFinal);
+        suscripcionTarget.setEstadoPago("PAGADO");
+        suscripcionTarget.setMetodoPago(dto.getMetodoPago() != null ? dto.getMetodoPago() : "TRANSFERENCIA");
+
+        Suscripcion guardada = suscripcionRepository.save(suscripcionTarget);
 
         empresa.setEstado("ACTIVO");
         empresaRepository.save(empresa);
 
+        // Notificar a los Bodegueros
         List<Usuario> bodegueros = usuarioRepository.findByEmpresaId(empresaId).stream()
                 .filter(u -> "BODEGUERO".equals(u.getRol()))
                 .collect(Collectors.toList());
@@ -83,8 +174,8 @@ public class SuscripcionServiceImpl implements SuscripcionService {
             notif.setEmpresa(empresa);
             notif.setUsuario(b);
             notif.setTipo("SUSCRIPCION");
-            notif.setTitulo("Suscripción Renovada");
-            notif.setMensaje("Tu suscripción ha sido renovada hasta el " + guardada.getFechaFin() + ".");
+            notif.setTitulo("Suscripción Renovada (" + planFinal + ")");
+            notif.setMensaje("Tu suscripción ha sido renovada hasta el " + guardada.getFechaFin().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + ".");
             notificacionRepository.save(notif);
         }
 

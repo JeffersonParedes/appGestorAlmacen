@@ -35,6 +35,9 @@ public class Producto {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal precio = BigDecimal.ZERO;
 
+    @Column(name = "stock_minimo", precision = 12, scale = 3)
+    private BigDecimal stockMinimo = BigDecimal.ZERO;
+
     @Column(name = "imagen_url", length = 500)
     private String imagenUrl;
 
@@ -127,6 +130,14 @@ public class Producto {
 
     public void setPrecio(BigDecimal precio) {
         this.precio = precio;
+    }
+
+    public BigDecimal getStockMinimo() {
+        return stockMinimo;
+    }
+
+    public void setStockMinimo(BigDecimal stockMinimo) {
+        this.stockMinimo = stockMinimo;
     }
 
     public String getImagenUrl() {

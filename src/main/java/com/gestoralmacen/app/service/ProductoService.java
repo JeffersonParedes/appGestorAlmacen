@@ -8,6 +8,10 @@ import java.util.List;
 public interface ProductoService {
     List<ProductoResponseDTO> listarActivosPorEmpresa(Long empresaId);
 
+    List<ProductoResponseDTO> listarTodosPorEmpresa(Long empresaId);
+
+    List<ProductoResponseDTO> listarAprobadosPorEmpresa(Long empresaId);
+
     // Para la "Papelera" de la que hablamos
     List<ProductoResponseDTO> listarBorradosPorEmpresa(Long empresaId);
 
@@ -33,4 +37,4 @@ public interface ProductoService {
     List<ProductoResponseDTO> consultarProductosConStockMinimo(Long empresaId);
 
     List<ProductoResponseDTO> consultarProductosProximosAVencer(Long empresaId, int diasThreshold);
-}
+}
